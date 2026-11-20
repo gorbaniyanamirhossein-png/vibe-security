@@ -1,0 +1,89 @@
+{
+  "app": {
+    "contact": "mailto:security@example-app.com",
+    "name": "Example Notes App",
+    "url": "https://notes.example-app.com"
+  },
+  "attestation": "verified",
+  "attested_at": "2026-11-20T00:00:00Z",
+  "checks": [
+    {
+      "id": "database-rls",
+      "method": "probe",
+      "note": "Anon SELECT returned 0 rows on all 3 tables; confirmed with fresh session.",
+      "result": "pass"
+    },
+    {
+      "id": "storage-private",
+      "method": "probe",
+      "note": "Private object request returned 403; bucket listing refused.",
+      "result": "pass"
+    },
+    {
+      "id": "no-privileged-key",
+      "method": "manual",
+      "note": "Searched shipped bundles; only the public anon key present.",
+      "result": "pass"
+    },
+    {
+      "id": "no-exposed-config",
+      "method": "probe",
+      "note": "GET /.env, /.git/config, /config.json returned 404.",
+      "result": "pass"
+    },
+    {
+      "id": "no-sourcemap-leak",
+      "method": "probe",
+      "note": "No .map files served.",
+      "result": "pass"
+    },
+    {
+      "id": "api-requires-auth",
+      "method": "manual",
+      "note": "Anonymous API calls refused; two-account cross-user read refused.",
+      "result": "pass"
+    },
+    {
+      "id": "security-headers",
+      "method": "probe",
+      "note": "HTTPS with nosniff and frame-ancestors.",
+      "result": "pass"
+    },
+    {
+      "id": "cors-restricted",
+      "method": "probe",
+      "note": "Preflight from unrelated origin refused.",
+      "result": "pass"
+    },
+    {
+      "id": "cookies-secure",
+      "method": "manual",
+      "note": "Token auth only; no auth cookies.",
+      "result": "not_applicable"
+    },
+    {
+      "id": "no-debug-endpoints",
+      "method": "probe",
+      "note": "/debug, /admin, /api/docs return 404.",
+      "result": "pass"
+    }
+  ],
+  "expires_at": "2027-02-18T00:00:00Z",
+  "stack": {
+    "backend": "supabase",
+    "builder": "lovable"
+  },
+  "verifier": {
+    "name": "Alex Verifier (ILLUSTRATIVE EXAMPLE — not a real verification)",
+    "contact": "https://example.org/verifier/alex",
+    "method": "vsa-4-step",
+    "public_key": {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "ju3hby8w5BSxVQiCWmbSawHZL6vd_7No5FORuWFrQE4",
+      "y": "Mqnf6hBrdB3j_6UZYFJVedCy5sIgVxzO8wohZVc1PwA"
+    }
+  },
+  "vibe_security_version": "0.2",
+  "signature": "kahtD-c8WDTAljq6GSbICMC3ojHBcuKxA4M0n5U-igNnf7_UFlTefgpaPlT6moOMug8FH3E84mNd7tbM6WuNMw"
+}

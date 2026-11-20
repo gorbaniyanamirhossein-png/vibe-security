@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vibe Security Attestation — Self-Check</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; padding: 16px; line-height: 1.5; max-width: 680px; margin-left: auto; margin-right: auto; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  h2 { font-size: 1.1rem; margin: 28px 0 8px; }
+  .sub { color: #666; margin: 0 0 16px; }
+  @media (prefers-color-scheme: dark) { .sub { color: #aaa; } }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.06); } 100% { transform: scale(1); } }
+  @keyframes slideDown { from { opacity: 0; max-height: 0; } to { opacity: 1; max-height: 120px; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+  .card { border: 1px solid #ccc; border-radius: 12px; padding: 14px; margin: 10px 0; animation: fadeUp .35s ease both; }
+  @media (prefers-color-scheme: dark) { .card { border-color: #444; } }
+  label { display: block; font-weight: 600; margin: 10px 0 4px; }
+  input[type="text"], input[type="url"], textarea, select { width: 100%; padding: 10px; border: 1px solid #bbb; border-radius: 8px; font-size: 1rem; background: inherit; color: inherit; }
+  textarea { min-height: 90px; font-family: ui-monospace, monospace; font-size: 0.85rem; }
+  select { padding: 9px; }
+  .check-title { font-weight: 700; }
+  .sev { font-size: 0.8rem; font-weight: 600; padding: 1px 7px; border-radius: 20px; margin-left: 6px; }
+  .sev-critical { background: #fde8e8; color: #9b1c1c; }
+  .sev-high { background: #fef3c7; color: #92400e; }
+  .sev-medium { background: #e0e7ff; color: #3730a3; }
+  @media (prefers-color-scheme: dark) {
+    .sev-critical { background: #5b1a1a; color: #fca5a5; }
+    .sev-high { background: #5b421a; color: #fcd34d; }
+    .sev-medium { background: #232a5b; color: #a5b4fc; }
+  }
+  .hint { color: #666; font-size: 0.9rem; margin: 4px 0 10px; }
+  @media (prefers-color-scheme: dark) { .hint { color: #aaa; } }
+  .fix { display: none; margin-top: 10px; padding: 10px; border-radius: 8px; background: #fef3c7; color: #92400e; font-size: 0.9rem; }
+  .fix.show { display: block; animation: slideDown .3s ease both; }
+  @media (prefers-color-scheme: dark) { .fix { background: #5b421a; color: #fcd34d; } }
+  .warn { display: none; margin-top: 8px; padding: 10px; border-radius: 8px; background: #fde8e8; color: #9b1c1c; font-size: 0.9rem; }
+  .warn.show { display: block; animation: slideDown .3s ease both; }
+  @media (prefers-color-scheme: dark) { .warn { background: #5b1a1a; color: #fca5a5; } }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .opts button { flex: 1 1 auto; min-width: 70px; padding: 9px 6px; border: 1px solid #bbb; border-radius: 8px; background: inherit; color: inherit; font-size: 0.95rem; cursor: pointer; transition: background .2s, border-color .2s, transform .15s; }
+  .opts button:active { transform: scale(.96); }
+  .opts button.sel-pass { background: #d1fae5; border-color: #059669; font-weight: 700; animation: pop .25s ease; }
+  .opts button.sel-fail { background: #fee2e2; border-color: #dc2626; font-weight: 700; animation: pop .25s ease; }
+  .opts button.sel-na { background: #e0e7ff; border-color: #4f46e5; font-weight: 700; animation: pop .25s ease; }
+  .opts button.sel-nt { background: #f3f4f6; border-color: #6b7280; font-weight: 700; animation: pop .25s ease; }
+  @media (prefers-color-scheme: dark) {
+    .opts button.sel-pass { background: #14532d; border-color: #22c55e; }
+    .opts button.sel-fail { background: #5b1a1a; border-color: #ef4444; }
+    .opts button.sel-na { background: #232a5b; border-color: #818cf8; }
+    .opts button.sel-nt { background: #333; border-color: #888; }
+  }
+  .note { margin-top: 8px; }
+  .note input { width: 100%; padding: 8px; border: 1px solid #bbb; border-radius: 8px; font-size: 0.9rem; background: inherit; color: inherit; }
+  .big { width: 100%; padding: 13px; font-size: 1.05rem; font-weight: 700; border: none; border-radius: 10px; background: #2563eb; color: #fff; cursor: pointer; margin-top: 14px; transition: background .2s, transform .15s; }
+  .big:active { transform: scale(.98); }
+  .big:disabled { background: #94a3b8; cursor: not-allowed; }
+  .secondary { width: 100%; padding: 11px; font-size: 1rem; border: 1px solid #bbb; border-radius: 10px; background: inherit; color: inherit; cursor: pointer; margin-top: 8px; transition: background .2s; }
+  pre { background: #f3f4f6; border-radius: 10px; padding: 12px; overflow-x: auto; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; }
+  @media (prefers-color-scheme: dark) { pre { background: #1f2937; } }
+  .verdict-ok { color: #059669; font-weight: 700; }
+  .verdict-bad { color: #dc2626; font-weight: 700; }
+  .verdict-warn { color: #d97706; font-weight: 700; }
+  .tabs { display: flex; gap: 8px; margin: 16px 0; }
+  .tabs button { flex: 1; padding: 11px 4px; border: 1px solid #bbb; border-radius: 10px; background: inherit; color: inherit; font-size: 0.95rem; cursor: pointer; transition: background .2s; }
+  .tabs button.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 700; }
+  .hidden { display: none; }
+  .small { font-size: 0.85rem; color: #666; }
+  @media (prefers-color-scheme: dark) { .small { color: #aaa; } }
+  .livebar { display: flex; align-items: center; gap: 16px; border: 1px solid #ccc; border-radius: 12px; padding: 12px 14px; margin: 10px 0; position: sticky; top: 8px; background: var(--hatch-widget-bg, Canvas); z-index: 5; }
+  @media (prefers-color-scheme: dark) { .livebar { border-color: #444; } }
+  .ring { flex: 0 0 auto; }
+  .ring-bg { fill: none; stroke: #e5e7eb; stroke-width: 8; }
+  .ring-fg { fill: none; stroke: #2563eb; stroke-width: 8; stroke-linecap: round; stroke-dasharray: 213.6; stroke-dashoffset: 213.6; transform: rotate(-90deg); transform-origin: center; transition: stroke-dashoffset .5s ease, stroke .3s; }
+  @media (prefers-color-scheme: dark) { .ring-bg { stroke: #374151; } }
+  .ring-text { font-size: 1rem; font-weight: 700; fill: currentColor; }
+  .live-summary { font-size: 0.95rem; }
+  .live-summary .n-pass { color: #059669; font-weight: 700; }
+  .live-summary .n-fail { color: #dc2626; font-weight: 700; }
+  .live-summary .n-left { color: #6b7280; font-weight: 700; }
+  .badge-live { margin-top: 6px; min-height: 22px; }
+  .badge-live .draft { opacity: .45; }
+  footer { margin-top: 32px; font-size: 0.85rem; color: #666; }
+  @media (prefers-color-scheme: dark) { footer { color: #aaa; } }
+</style>
+</head>
+<body>
+<h1>🛡️ Vibe Security Attestation</h1>
+<p class="sub">A publishable security check for apps built with AI tools. Free, open, no server,
+no account. Everything on this page runs in your browser — nothing leaves your device.</p>
+
+<div class="tabs">
+  <button id="tab-make" class="active" onclick="showTab('make')">Make a file</button>
+  <button id="tab-check" onclick="showTab('check')">Check a file</button>
+  <button id="tab-sign" onclick="showTab('sign')">Verifier tools</button>
+</div>
+
+<!-- ============ MAKE MODE ============ -->
+<div id="pane-make">
+  <h2>Step 1 — Your app</h2>
+  <div class="card">
+    <label for="appName">App name</label>
+    <input type="text" id="appName" placeholder="My Notes App" maxlength="100" oninput="liveBadge()">
+    <label for="appUrl">App URL (must start with https://)</label>
+    <input type="url" id="appUrl" placeholder="https://my-app.com" oninput="liveBadge()">
+    <label for="appContact">Contact for security reports (optional)</label>
+    <input type="text" id="appContact" placeholder="mailto:security@my-app.com or https://my-app.com/contact">
+    <label for="stackBackend">Backend (optional)</label>
+    <select id="stackBackend">
+      <option value="">— not sure / prefer not to say —</option>
+      <option value="supabase">Supabase</option>
+      <option value="firebase">Firebase</option>
+      <option value="other">Other backend</option>
+      <option value="none">No backend</option>
+    </select>
+    <label for="stackBuilder">Built with (optional)</label>
+    <select id="stackBuilder">
+      <option value="">— not sure / prefer not to say —</option>
+      <option value="lovable">Lovable</option>
+      <option value="replit">Replit</option>
+      <option value="bolt">Bolt</option>
+      <option value="v0">v0</option>
+      <option value="cursor">Cursor</option>
+      <option value="other">Other</option>
+    </select>
+    <p class="small">This page makes a <b>self-declared</b> file — your own claim about your app.
+    A <b>verified</b> file is issued by an independent verifier, not by this tab.</p>
+  </div>
+
+  <h2>Step 2 — Answer the 10 checks</h2>
+  <p class="sub">Only answer for your own app. Test each one with read-only requests — never
+  try to break in, and never write or delete data.</p>
+  <div class="livebar">
+    <svg class="ring" width="76" height="76" viewBox="0 0 84 84" aria-hidden="true">
+      <circle cx="42" cy="42" r="34" class="ring-bg"></circle>
+      <circle cx="42" cy="42" r="34" class="ring-fg" id="ringFg"></circle>
+      <text x="42" y="47" text-anchor="middle" class="ring-text" id="ringText">0/10</text>
+    </svg>
+    <div>
+      <div class="live-summary" id="liveSummary">Answer all 10 checks to get your file.</div>
+      <div class="badge-live" id="badgeLive"></div>
+    </div>
+  </div>
+  <div id="checks"></div>
+
+  <h2>Step 3 — Get your file and badge</h2>
+  <button class="big" id="genBtn" onclick="generate()" disabled>Answer all 10 checks to generate</button>
+  <div id="output" class="hidden">
+    <pre id="jsonOut"></pre>
+    <button class="secondary" onclick="copyJson()">Copy JSON</button>
+    <button class="secondary" onclick="downloadJson()">Download vibe-security.json</button>
+    <h2>Badge</h2>
+    <p class="small">Paste this into your app. It links to your attestation file.</p>
+    <div id="badgePreview"></div>
+    <textarea id="badgeSnippet" readonly></textarea>
+    <button class="secondary" onclick="copyBadge()">Copy badge HTML</button>
+    <h2>Publish</h2>
+    <p class="small">Upload the file to <b>/.well-known/vibe-security.json</b> on your app's
+    domain (most hosts let you add a file to the public folder). Then anyone can read it at
+    <span id="publishUrl"></span>. The file expires in 90 days — re-check and republish
+    before then.</p>
+  </div>
+</div>
+
+<!-- ============ CHECK MODE ============ -->
+<div id="pane-check" class="hidden">
+  <h2>Check an attestation file</h2>
+  <p class="sub">Paste a file's contents, or enter an app URL to fetch it from
+  <b>/.well-known/vibe-security.json</b>. Fetching only works if the app's server allows
+  cross-origin reads — if it fails, paste the file instead.</p>
+  <div class="card">
+    <label for="checkUrl">App URL (optional)</label>
+    <input type="url" id="checkUrl" placeholder="https://my-app.com">
+    <button class="secondary" onclick="fetchFile()">Fetch the file</button>
+    <label for="checkJson">Or paste the file contents</label>
+    <textarea id="checkJson" placeholder='{"vibe_security_version": "0.2", ...}'></textarea>
+    <button class="big" onclick="validatePasted()">Validate</button>
+  </div>
+  <div id="verdict"></div>
+</div>
+
+<!-- ============ VERIFIER TOOLS ============ -->
+<div id="pane-sign" class="hidden">
+  <h2>Verifier tools</h2>
+  <p class="sub">For independent verifiers. Keys are generated in your browser and never leave
+  it. Signing needs a secure context (https or localhost) — if the buttons do nothing, open
+  this page over https.</p>
+  <div class="card">
+    <h2 style="margin-top:0">1 — Generate a keypair</h2>
+    <button class="secondary" onclick="genKeypair()">Generate P-256 keypair</button>
+    <div id="keyOut" class="hidden">
+      <label>Public key (publish this on your profile so readers can match it)</label>
+      <textarea id="pubKeyOut" readonly></textarea>
+      <button class="secondary" onclick="copyField('pubKeyOut')">Copy public key</button>
+      <label>Private key — KEEP SECRET. Store it in a password manager. Never publish it.</label>
+      <textarea id="privKeyOut" readonly></textarea>
+      <button class="secondary" onclick="copyField('privKeyOut')">Copy private key</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">2 — Sign a verified file</h2>
+    <p class="small">Paste an <b>unsigned</b> verified-tier file (attestation "verified",
+    verifier null, every applicable check passed, no scanner-only passes), your private key,
+    and your details. You get back the signed file.</p>
+    <label for="signName">Your name (as it will appear in the file)</label>
+    <input type="text" id="signName" placeholder="Alex Verifier" maxlength="200">
+    <label for="signContact">Your contact (URL or mailto:)</label>
+    <input type="text" id="signContact" placeholder="https://example.org/verifier/alex">
+    <label for="signPriv">Private key (JWK, from step 1)</label>
+    <textarea id="signPriv" placeholder='{"kty":"EC","crv":"P-256","x":"...","y":"...","d":"..."}'></textarea>
+    <label for="signFile">Unsigned attestation file (JSON)</label>
+    <textarea id="signFile" placeholder='{"vibe_security_version": "0.2", "attestation": "verified", ...}'></textarea>
+    <button class="big" onclick="signInPage()">Sign the file</button>
+    <div id="signOut" class="hidden">
+      <pre id="signedJsonOut"></pre>
+      <button class="secondary" onclick="copySigned()">Copy signed file</button>
+      <button class="secondary" onclick="downloadSigned()">Download signed file</button>
+      <p class="small">Badge for this file:</p>
+      <div id="signedBadgePreview"></div>
+      <textarea id="signedBadgeSnippet" readonly></textarea>
+      <button class="secondary" onclick="copySignedBadge()">Copy badge HTML</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Vibe Security Attestation (VSA) v0.2 — Specification: CC BY 4.0. Schema and this page:
+  Apache 2.0. A badge is a transparency claim, not a security guarantee. A pass is not a
+  penetration test.
+</footer>
+
+<script>
+const CHECKS = [
+  { id: "database-rls", title: "No table readable without login", sev: "critical",
+    plain: "Nobody can read your database tables without logging in.",
+    howto: "How to test: with only the public anon key from your own frontend code, request rows from each table. Pass = 0 rows or refused.",
+    fix: "Fix: turn on Row Level Security and add a policy that only lets each signed-in user read their own rows." },
+  { id: "storage-private", title: "No private file downloadable without login", sev: "critical",
+    plain: "Private uploads (photos, documents) cannot be downloaded by strangers.",
+    howto: "How to test: open a private file link and a bucket listing in a logged-out browser. Pass = refused (403/404).",
+    fix: "Fix: make the bucket private, or add a policy so only the owner can download each file." },
+  { id: "no-privileged-key", title: "No master key in browser code", sev: "critical",
+    plain: "No service_role, admin, or private key is shipped inside the app's JavaScript.",
+    howto: "How to test: search your shipped JS bundles for service_role keys, admin credentials, or private API keys. The public anon key is fine.",
+    fix: "Fix: remove the key from the code, rotate it, and move the work to a server function that runs with the key." },
+  { id: "no-exposed-config", title: "No .env / .git / config file served", sev: "critical",
+    plain: "Config files are not publicly downloadable from your site.",
+    howto: "How to test: open yoursite.com/.env and yoursite.com/.git/config. Pass = 404 or refused.",
+    fix: "Fix: remove the file from the deployment and make sure your deploy only publishes the public folder." },
+  { id: "no-sourcemap-leak", title: "No source map leaking source or secrets", sev: "high",
+    plain: "Source maps are not public — or contain no secrets.",
+    howto: "How to test: try opening a .js.map URL for your bundles. Pass = 404, or maps contain no secrets.",
+    fix: "Fix: turn off source maps in production, or strip secrets from them before deploying." },
+  { id: "api-requires-auth", title: "API routes need login; no cross-user read", sev: "critical",
+    plain: "Sensitive API calls fail without login, and one user cannot read another user's data.",
+    howto: "How to test: call an API route logged out (must fail), and with two test accounts try reading user A's data as user B (must fail).",
+    fix: "Fix: require a valid session on every route, and check the caller owns the data they ask for." },
+  { id: "security-headers", title: "HTTPS + baseline security headers", sev: "medium",
+    plain: "Your app is served over HTTPS with basic security headers.",
+    howto: "How to test: open your site and check the response headers for X-Content-Type-Options: nosniff and framing protection (CSP frame-ancestors or X-Frame-Options).",
+    fix: "Fix: add the headers in your hosting config — most hosts have a headers section." },
+  { id: "cors-restricted", title: "No wildcard CORS on API/data", sev: "high",
+    plain: "Other websites cannot call your API as your users.",
+    howto: "How to test: send a preflight (OPTIONS) request to your API from an unrelated origin. Pass = arbitrary origins are not allowed.",
+    fix: "Fix: allow only your own app's origin in the CORS settings." },
+  { id: "cookies-secure", title: "Auth cookies are Secure + HttpOnly + SameSite", sev: "medium",
+    plain: "Login cookies carry all three security flags.",
+    howto: "How to test: inspect the Set-Cookie headers after login. If your app uses no cookie auth (tokens only), choose N/A.",
+    fix: "Fix: set Secure, HttpOnly, and SameSite=Lax (or Strict) on every auth cookie." },
+  { id: "no-debug-endpoints", title: "No public debug/admin endpoint", sev: "medium",
+    plain: "Debug pages, admin pages, and API docs do not expose live data to strangers.",
+    howto: "How to test: open /debug, /admin, /api/docs without logging in. Pass = refused, or nothing live is exposed.",
+    fix: "Fix: remove debug pages from the production build, or put them behind a login." }
+];
+const RESULTS = ["pass", "fail", "not_applicable", "not_tested"];
+const RESULT_LABEL = { pass: "Pass", fail: "Fail", not_applicable: "N/A", not_tested: "Not tested" };
+const CHECK_IDS = CHECKS.map(c => c.id);
+const state = {};
+CHECKS.forEach(c => state[c.id] = { result: "not_tested", method: "manual", note: "" });
+
+// Secret-like patterns for the live note warning (spec section 3.3).
+const SECRET_PATTERNS = [
+  /service_role/i, /sk-[A-Za-z0-9]{8,}/, /eyJ[A-Za-z0-9_-]{10,}\./,
+  /AKIA[0-9A-Z]{16}/, /-----BEGIN [A-Z ]*KEY-----/,
+  /postgres(ql)?:\/\/[^:\s]+:[^@\s]+@/i, /sbp_[A-Za-z0-9]{20,}/, /xox[baprs]-[A-Za-z0-9-]+/
+];
+function looksLikeSecret(text) { return SECRET_PATTERNS.some(p => p.test(text)); }
+
+/* ---- Canonical JSON + crypto (must match sign.js byte for byte) ---- */
+function canonicalize(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return "[" + value.map(canonicalize).join(",") + "]";
+  const keys = Object.keys(value).sort();
+  return "{" + keys.map(k => JSON.stringify(k) + ":" + canonicalize(value[k])).join(",") + "}";
+}
+function b64urlEncode(bytes) {
+  let s = "";
+  bytes.forEach(b => s += String.fromCharCode(b));
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function b64urlDecode(str) {
+  const b64 = str.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - str.length % 4) % 4);
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function cryptoAvailable() {
+  return typeof crypto !== "undefined" && crypto.subtle && typeof TextEncoder !== "undefined";
+}
+async function verifySignature(obj) {
+  // Returns {checked: bool, ok: bool, reason: string}
+  if (obj.attestation !== "verified") return { checked: false, ok: false, reason: "not a verified file" };
+  if (!obj.signature) return { checked: true, ok: false, reason: "no signature field" };
+  if (!obj.verifier || !obj.verifier.public_key) return { checked: true, ok: false, reason: "no verifier public key" };
+  if (!cryptoAvailable()) return { checked: false, ok: false, reason: "this browser cannot verify signatures (needs a secure context)" };
+  try {
+    const unsigned = JSON.parse(JSON.stringify(obj));
+    delete unsigned.signature;
+    const data = new TextEncoder().encode(canonicalize(unsigned));
+    const sig = b64urlDecode(obj.signature);
+    if (sig.length !== 64) return { checked: true, ok: false, reason: "signature must be 64 bytes" };
+    const key = await crypto.subtle.importKey("jwk", obj.verifier.public_key,
+      { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+    const ok = await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, sig, data);
+    return { checked: true, ok, reason: ok ? "signature valid" : "signature does not match the file contents" };
+  } catch (e) {
+    return { checked: true, ok: false, reason: "signature check failed: " + e.message };
+  }
+}
+
+function showTab(which) {
+  ["make", "check", "sign"].forEach(t => {
+    document.getElementById("pane-" + t).classList.toggle("hidden", t !== which);
+    document.getElementById("tab-" + t).classList.toggle("active", t === which);
+  });
+}
+
+/* ---- Make tab: live UI ---- */
+function renderChecks() {
+  const wrap = document.getElementById("checks");
+  wrap.innerHTML = "";
+  CHECKS.forEach((c, i) => {
+    const div = document.createElement("div");
+    div.className = "card";
+    div.style.animationDelay = (i * 0.05) + "s";
+    div.innerHTML =
+      '<div><span class="check-title">' + (i + 1) + '. ' + c.title + '</span>' +
+      '<span class="sev sev-' + c.sev + '">' + c.sev + '</span></div>' +
+      '<div class="hint">' + c.plain + '<br>' + c.howto + '</div>' +
+      '<div class="opts"></div>' +
+      '<div class="fix" id="fix-' + c.id + '">' + c.fix + '</div>' +
+      '<div class="note"><input type="text" maxlength="300" placeholder="One-sentence note (optional, public — never put secrets or user data here)"></div>' +
+      '<div class="warn" id="warn-' + c.id + '">⚠️ This note looks like it contains a secret (key, token, or password). Remove it — notes are public.</div>' +
+      '<div class="note"><label style="font-weight:400;font-size:0.9rem">How did you test it?</label>' +
+      '<select><option value="manual">Manual test (I checked by hand)</option>' +
+      '<option value="probe">Probe (live read-only requests)</option>' +
+      '<option value="scanner">Scanner (a tool checked, I reviewed it)</option></select></div>';
+    wrap.appendChild(div);
+    const opts = div.querySelector(".opts");
+    RESULTS.forEach(r => {
+      const b = document.createElement("button");
+      b.textContent = RESULT_LABEL[r];
+      b.dataset.result = r;
+      b.onclick = () => selectResult(c.id, r);
+      opts.appendChild(b);
+    });
+    const noteInput = div.querySelector(".note input");
+    noteInput.oninput = () => {
+      state[c.id].note = noteInput.value;
+      document.getElementById("warn-" + c.id).classList.toggle("show", looksLikeSecret(noteInput.value));
+    };
+    div.querySelector("select").onchange = (e) => { state[c.id].method = e.target.value; };
+    updateCard(c.id);
+  });
+  updateLive();
+}
+
+function selectResult(id, result) {
+  state[id].result = result;
+  updateCard(id);
+  updateLive();
+}
+
+function updateCard(id) {
+  const card = document.querySelector("#fix-" + id).closest(".card");
+  card.querySelectorAll(".opts button").forEach(b => {
+    const r = b.dataset.result;
+    b.className = state[id].result === r
+      ? "sel-" + (r === "pass" ? "pass" : r === "fail" ? "fail" : r === "not_applicable" ? "na" : "nt")
+      : "";
+  });
+  document.getElementById("fix-" + id).classList.toggle("show", state[id].result === "fail");
+}
+
+function counts() {
+  const c = { pass: 0, fail: 0, na: 0, left: 0, critFail: 0 };
+  CHECKS.forEach(ch => {
+    const r = state[ch.id].result;
+    if (r === "pass") c.pass++;
+    else if (r === "fail") { c.fail++; if (ch.sev === "critical") c.critFail++; }
+    else if (r === "not_applicable") c.na++;
+    else c.left++;
+  });
+  return c;
+}
+
+function updateLive() {
+  const c = counts();
+  const answered = 10 - c.left;
+  const ring = document.getElementById("ringFg");
+  ring.style.strokeDashoffset = String(213.6 * (1 - answered / 10));
+  ring.style.stroke = c.left === 0 ? (c.fail ? "#d97706" : "#059669") : "#2563eb";
+  document.getElementById("ringText").textContent = answered + "/10";
+  let summary = '<span class="n-pass">' + c.pass + ' pass</span> · <span class="n-fail">' + c.fail + ' fail</span> · ' +
+    c.na + ' N/A · <span class="n-left">' + c.left + ' left</span>';
+  if (c.left === 0) {
+    summary += c.fail
+      ? "<br><b>Ready — but " + c.fail + " check" + (c.fail > 1 ? "s" : "") + " fail" + (c.critFail ? ", " + c.critFail + " critical" : "") + ". Fix them, or publish honestly.</b>"
+      : "<br><b>All checks answered — ready to publish!</b>";
+  } else {
+    summary += "<br>Answer " + c.left + " more to generate your file.";
+  }
+  document.getElementById("liveSummary").innerHTML = summary;
+  const btn = document.getElementById("genBtn");
+  btn.disabled = c.left !== 0;
+  btn.textContent = c.left === 0 ? "Generate vibe-security.json" : "Answer all 10 checks to generate";
+  liveBadge();
+}
+
+function monthStr(d) {
+  return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0");
+}
+
+function badgeSvg(text, color) {
+  const label = "vibe-security";
+  const lw = Math.round(label.length * 7 + 12), vw = Math.round(text.length * 7.5 + 12), w = lw + vw;
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="20" role="img" aria-label="' + label + ': ' + text + '">' +
+    '<title>' + label + ': ' + text + '</title>' +
+    '<linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>' +
+    '<clipPath id="r"><rect width="' + w + '" height="20" rx="3" fill="#fff"/></clipPath>' +
+    '<g clip-path="url(#r)"><rect width="' + lw + '" height="20" fill="#555"/><rect x="' + lw + '" width="' + vw + '" height="20" fill="' + color + '"/>' +
+    '<rect width="' + w + '" height="20" fill="url(#s)"/></g>' +
+    '<g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">' +
+    '<text x="' + (lw / 2) + '" y="15" fill="#010101" fill-opacity=".3">' + label + '</text>' +
+    '<text x="' + (lw / 2) + '" y="14">' + label + '</text>' +
+    '<text x="' + (lw + vw / 2) + '" y="15" fill="#010101" fill-opacity=".3">' + text + '</text>' +
+    '<text x="' + (lw + vw / 2) + '" y="14">' + text + '</text></g></svg>';
+}
+
+function liveBadge() {
+  const el = document.getElementById("badgeLive");
+  const c = counts();
+  const url = document.getElementById("appUrl").value.trim().replace(/\/+$/, "");
+  const month = monthStr(new Date());
+  if (c.left === 0 && url.startsWith("https://")) {
+    el.innerHTML = '<a href="' + esc(url) + '/.well-known/vibe-security.json">' + badgeSvg("self-checked · " + month, "#007ec6") + '</a>';
+  } else {
+    el.innerHTML = '<span class="draft">' + badgeSvg("self-checked · " + month, "#007ec6") + '</span> <span class="small">preview — complete the checks to publish</span>';
+  }
+}
+
+function buildFile() {
+  const name = document.getElementById("appName").value.trim();
+  let url = document.getElementById("appUrl").value.trim().replace(/\/+$/, "");
+  const contact = document.getElementById("appContact").value.trim();
+  const backend = document.getElementById("stackBackend").value;
+  const builder = document.getElementById("stackBuilder").value;
+  if (!name) { alert("Please enter the app name."); return null; }
+  if (!url || !url.startsWith("https://")) { alert("Please enter the app URL starting with https://"); return null; }
+  if (contact && !/^(https:|mailto:)/i.test(contact)) { alert("Contact must be an https:// URL or a mailto: address."); return null; }
+  if (counts().left !== 0) { alert("Please answer all 10 checks first."); return null; }
+  const secretNotes = CHECKS.filter(ch => looksLikeSecret(state[ch.id].note));
+  if (secretNotes.length && !confirm("One or more notes look like they contain a secret. Notes are public. Generate anyway?")) return null;
+  const now = new Date();
+  const exp = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+  const file = {
+    vibe_security_version: "0.2",
+    app: { name: name, url: url },
+    attested_at: now.toISOString().replace(/\.\d+Z$/, "Z"),
+    expires_at: exp.toISOString().replace(/\.\d+Z$/, "Z"),
+    attestation: "self-declared",
+    checks: CHECKS.map(c => {
+      const s = state[c.id];
+      const o = { id: c.id, result: s.result, method: s.method };
+      if (s.note.trim()) o.note = s.note.trim();
+      return o;
+    }),
+    verifier: null
+  };
+  if (contact) file.app.contact = contact;
+  if (backend || builder) {
+    file.stack = {};
+    if (backend) file.stack.backend = backend;
+    if (builder) file.stack.builder = builder;
+  }
+  return file;
+}
+
+function generate() {
+  const file = buildFile();
+  if (!file) return;
+  const json = JSON.stringify(file, null, 2);
+  document.getElementById("jsonOut").textContent = json;
+  const url = file.app.url;
+  const svg = badgeSvg("self-checked · " + monthStr(new Date(file.attested_at)), "#007ec6");
+  const snippet = '<a href="' + url + '/.well-known/vibe-security.json">\n  ' + svg + '\n</a>';
+  document.getElementById("badgePreview").innerHTML = '<a href="' + url + '/.well-known/vibe-security.json">' + svg + '</a>';
+  document.getElementById("badgeSnippet").value = snippet;
+  document.getElementById("publishUrl").textContent = url + "/.well-known/vibe-security.json";
+  document.getElementById("output").classList.remove("hidden");
+  document.getElementById("output").scrollIntoView({ behavior: "smooth" });
+  window._lastJson = json;
+}
+
+function copyJson() { navigator.clipboard.writeText(window._lastJson || "").then(() => alert("Copied.")); }
+function copyBadge() { navigator.clipboard.writeText(document.getElementById("badgeSnippet").value).then(() => alert("Copied.")); }
+function copyField(id) { navigator.clipboard.writeText(document.getElementById(id).value).then(() => alert("Copied.")); }
+function downloadJson() {
+  const blob = new Blob([window._lastJson || ""], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "vibe-security.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---- Check mode ---- */
+function validateFile(obj) {
+  const problems = [], notes = [];
+  if (!obj || typeof obj !== "object") return { ok: false, problems: ["Not a JSON object."], notes };
+  if (obj.vibe_security_version !== "0.2") problems.push('vibe_security_version must be "0.2".');
+  if (!obj.app || typeof obj.app.name !== "string" || !obj.app.name.trim()) problems.push("app.name is missing.");
+  if (!obj.app || typeof obj.app.url !== "string" || !obj.app.url.startsWith("https://")) problems.push("app.url must be an https:// URL.");
+  if (obj.app && obj.app.contact && !/^(https:|mailto:)/i.test(obj.app.contact)) problems.push("app.contact must be an https:// URL or a mailto: address.");
+  if (obj.stack) {
+    if (obj.stack.backend && !["supabase", "firebase", "other", "none"].includes(obj.stack.backend)) problems.push("Unknown stack.backend: " + obj.stack.backend);
+    if (obj.stack.builder && !["lovable", "replit", "bolt", "v0", "cursor", "other"].includes(obj.stack.builder)) problems.push("Unknown stack.builder: " + obj.stack.builder);
+  }
+  const att = Date.parse(obj.attested_at), exp = Date.parse(obj.expires_at);
+  if (isNaN(att)) problems.push("attested_at is not a valid date-time.");
+  if (isNaN(exp)) problems.push("expires_at is not a valid date-time.");
+  if (!isNaN(att) && !isNaN(exp)) {
+    if (exp <= att) problems.push("expires_at must be after attested_at.");
+    if (exp - att > 90 * 24 * 60 * 60 * 1000) problems.push("expires_at is more than 90 days after attested_at.");
+    if (exp < Date.now()) notes.push("EXPIRED on " + new Date(exp).toISOString().slice(0, 10) + " — treat as stale.");
+  }
+  if (obj.attestation !== "self-declared" && obj.attestation !== "verified") problems.push('attestation must be "self-declared" or "verified".');
+  if (!Array.isArray(obj.checks) || obj.checks.length !== 10) {
+    problems.push("checks must contain exactly the 10 checks.");
+  } else {
+    const seen = {};
+    obj.checks.forEach(ch => {
+      if (!CHECK_IDS.includes(ch.id)) problems.push("Unknown check id: " + ch.id);
+      if (seen[ch.id]) problems.push("Duplicate check id: " + ch.id);
+      seen[ch.id] = true;
+      if (!RESULTS.includes(ch.result)) problems.push("Invalid result for " + ch.id + ": " + ch.result);
+      if (!["probe", "manual", "scanner"].includes(ch.method)) problems.push("Invalid method for " + ch.id + ": " + ch.method);
+      if (ch.note && ch.note.length > 300) problems.push("Note too long for " + ch.id + " (max 300 chars).");
+      if (ch.note && looksLikeSecret(ch.note)) notes.push("Warning: the note on " + ch.id + " looks like it contains a secret.");
+    });
+    CHECK_IDS.forEach(id => { if (!seen[id]) problems.push("Missing check: " + id); });
+  }
+  if (obj.attestation === "verified") {
+    if (!obj.verifier || typeof obj.verifier !== "object") problems.push("Verified files need a verifier object.");
+    else {
+      if (!obj.verifier.name) problems.push("verifier.name is missing.");
+      if (!obj.verifier.contact) problems.push("verifier.contact is missing.");
+      if (obj.verifier.method !== "vsa-4-step") problems.push('verifier.method must be "vsa-4-step".');
+      const pk = obj.verifier.public_key;
+      if (!pk || pk.kty !== "EC" || pk.crv !== "P-256" || !pk.x || !pk.y) problems.push("verifier.public_key must be a P-256 JWK (kty EC, crv P-256, x, y).");
+    }
+    if (!obj.signature || typeof obj.signature !== "string" || !/^[A-Za-z0-9_-]{86}$/.test(obj.signature)) problems.push("Verified files need a signature (86-char base64url).");
+    if (Array.isArray(obj.checks)) {
+      obj.checks.forEach(ch => {
+        if (ch.result === "fail" || ch.result === "not_tested") problems.push("Verified files cannot have " + ch.result + " on " + ch.id + ".");
+        if (ch.result === "pass" && ch.method === "scanner") problems.push("Verified pass on " + ch.id + " needs probe or manual, not scanner-only.");
+        if (ch.result === "not_applicable" && ch.method !== "manual") problems.push("Verified not_applicable on " + ch.id + " needs method manual.");
+      });
+    }
+  }
+  if (obj.attestation === "self-declared") {
+    if (obj.verifier !== null && obj.verifier !== undefined) problems.push("Self-declared files must have verifier: null.");
+    if ("signature" in obj) problems.push("Self-declared files must not have a signature.");
+  }
+  const fails = Array.isArray(obj.checks) ? obj.checks.filter(c => c.result === "fail").map(c => c.id) : [];
+  const untested = Array.isArray(obj.checks) ? obj.checks.filter(c => c.result === "not_tested").map(c => c.id) : [];
+  if (fails.length) notes.push("Failing checks: " + fails.join(", ") + ".");
+  if (untested.length) notes.push("Not tested: " + untested.join(", ") + " — the file cannot carry a badge until these are answered.");
+  return { ok: problems.length === 0, problems, notes, fails, untested };
+}
+
+async function showVerdict(obj, fetchedFrom) {
+  const v = validateFile(obj);
+  const el = document.getElementById("verdict");
+  el.innerHTML = '<div class="card"><p>Checking…</p></div>';
+  let sig = { checked: false, ok: false, reason: "" };
+  if (obj && obj.attestation === "verified" && v.problems.length === 0) {
+    sig = await verifySignature(obj);
+    if (sig.checked && !sig.ok) { v.problems.push("Signature: " + sig.reason); v.ok = false; }
+  }
+  let domainNote = "";
+  if (fetchedFrom && obj && obj.app && obj.app.url) {
+    try {
+      const fetchedHost = new URL(fetchedFrom).hostname;
+      const claimedHost = new URL(obj.app.url).hostname;
+      if (fetchedHost !== claimedHost) {
+        v.problems.push("Domain mismatch: fetched from " + fetchedHost + " but the file claims " + claimedHost + ".");
+        v.ok = false;
+      } else {
+        domainNote = "Domain matches the file's app.url. ";
+      }
+    } catch (e) { /* ignore URL parse errors here; already reported */ }
+  }
+  let html = "";
+  if (v.ok) {
+    const expired = v.notes.some(n => n.startsWith("EXPIRED"));
+    html = '<div class="card"><p class="' + (expired ? "verdict-warn" : "verdict-ok") + '">' +
+      (expired ? "⚠️ Valid format, but EXPIRED." : "✅ Valid attestation file.") + "</p>";
+    if (obj.app) html += "<p><b>App:</b> " + esc(obj.app.name) + " — " + esc(obj.app.url) + "</p>";
+    if (obj.stack) html += "<p><b>Stack:</b> " + esc(obj.stack.backend || "?") + " / " + esc(obj.stack.builder || "?") + "</p>";
+    html += "<p><b>Tier:</b> " + esc(obj.attestation) + " · <b>Attested:</b> " + esc(String(obj.attested_at).slice(0, 10)) +
+      " · <b>Expires:</b> " + esc(String(obj.expires_at).slice(0, 10)) + "</p>";
+    if (obj.verifier) html += "<p><b>Verifier:</b> " + esc(obj.verifier.name) + " (" + esc(obj.verifier.contact) + ")</p>";
+    if (sig.checked) html += '<p><b>Signature:</b> <span class="' + (sig.ok ? "verdict-ok" : "verdict-bad") + '">' + esc(sig.reason) + "</span></p>";
+    if (!sig.checked && obj.attestation === "verified") html += '<p class="verdict-warn"><b>Signature:</b> ' + esc(sig.reason || "not checked") + "</p>";
+    if (fetchedFrom) {
+      const badgeOk = !expired && v.untested.length === 0;
+      html += "<p><b>Badge status:</b> " + (badgeOk
+        ? '<span class="verdict-ok">valid — the link resolves to this valid, unexpired file.</span>'
+        : '<span class="verdict-warn">not valid — ' + (expired ? "the file is expired." : "the file has unanswered checks.") + "</span>") + "</p>";
+      if (domainNote) html += '<p class="small">' + esc(domainNote) + "</p>";
+    }
+    if (obj.attestation === "verified") html += '<p class="small">Reminder: also compare the verifier\'s public key against a key they publish on their own domain or profile — a signature only proves the key holder signed it.</p>';
+    if (Array.isArray(obj.checks)) {
+      html += "<p><b>Checks:</b></p><ul>";
+      obj.checks.forEach(ch => { html += "<li>" + esc(ch.id) + ": <b>" + esc(ch.result) + "</b> (" + esc(ch.method) + ")" + (ch.note ? " — " + esc(ch.note) : "") + "</li>"; });
+      html += "</ul>";
+    }
+  } else {
+    html = '<div class="card"><p class="verdict-bad">❌ Invalid file.</p><ul>';
+    v.problems.forEach(p => { html += "<li>" + esc(p) + "</li>"; });
+    html += "</ul>";
+  }
+  if (v.notes.length) html += "<p>" + v.notes.map(esc).join("<br>") + "</p>";
+  html += "</div>";
+  el.innerHTML = html;
+}
+
+function esc(s) { return String(s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
+
+async function validatePasted() {
+  const raw = document.getElementById("checkJson").value.trim();
+  if (!raw) { alert("Paste a file first."); return; }
+  try { await showVerdict(JSON.parse(raw), null); }
+  catch (e) { document.getElementById("verdict").innerHTML = '<div class="card"><p class="verdict-bad">❌ Not valid JSON: ' + esc(e.message) + "</p></div>"; }
+}
+
+async function fetchFile() {
+  let url = document.getElementById("checkUrl").value.trim().replace(/\/+$/, "");
+  if (!url || !url.startsWith("https://")) { alert("Enter an app URL starting with https://"); return; }
+  const target = url + "/.well-known/vibe-security.json";
+  try {
+    const res = await fetch(target);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const obj = await res.json();
+    document.getElementById("checkJson").value = JSON.stringify(obj, null, 2);
+    await showVerdict(obj, url);
+  } catch (e) {
+    document.getElementById("verdict").innerHTML = '<div class="card"><p class="verdict-warn">⚠️ Could not fetch ' + esc(target) + " (" + esc(e.message) + "). The server may block cross-origin reads — paste the file contents instead.</p></div>";
+  }
+}
+
+/* ---- Verifier tools ---- */
+async function genKeypair() {
+  if (!cryptoAvailable()) { alert("Key generation needs a secure context (https or localhost)."); return; }
+  const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const pub = await crypto.subtle.exportKey("jwk", pair.publicKey);
+  const priv = await crypto.subtle.exportKey("jwk", pair.privateKey);
+  document.getElementById("pubKeyOut").value = JSON.stringify(pub);
+  document.getElementById("privKeyOut").value = JSON.stringify(priv);
+  document.getElementById("keyOut").classList.remove("hidden");
+}
+
+async function signInPage() {
+  if (!cryptoAvailable()) { alert("Signing needs a secure context (https or localhost)."); return; }
+  const name = document.getElementById("signName").value.trim();
+  const contact = document.getElementById("signContact").value.trim();
+  let privJwk, obj;
+  try { privJwk = JSON.parse(document.getElementById("signPriv").value.trim()); }
+  catch (e) { alert("Private key is not valid JSON."); return; }
+  try { obj = JSON.parse(document.getElementById("signFile").value.trim()); }
+  catch (e) { alert("File is not valid JSON."); return; }
+  if (!name) { alert("Enter your name."); return; }
+  if (!contact || !/^(https:|mailto:)/i.test(contact)) { alert("Enter a contact URL (https:) or mailto: address."); return; }
+  if (obj.attestation !== "verified") { alert('Only verified-tier files can be signed (attestation must be "verified").'); return; }
+  if (obj.signature) { alert("This file already has a signature."); return; }
+  const v = validateFile(Object.assign({}, obj, { verifier: { name, contact, method: "vsa-4-step", public_key: { kty: "EC", crv: "P-256", x: privJwk.x, y: privJwk.y } }, signature: "a".repeat(86) }));
+  const sigProblems = v.problems.filter(p => !p.startsWith("Signature"));
+  if (sigProblems.length) { alert("Cannot sign:\n- " + sigProblems.join("\n- ")); return; }
+  try {
+    const privKey = await crypto.subtle.importKey("jwk", privJwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+    const pubJwk = { kty: "EC", crv: "P-256", x: privJwk.x, y: privJwk.y };
+    const signed = JSON.parse(JSON.stringify(obj));
+    signed.verifier = { name, contact, method: "vsa-4-step", public_key: pubJwk };
+    const unsigned = JSON.parse(JSON.stringify(signed));
+    delete unsigned.signature;
+    const data = new TextEncoder().encode(canonicalize(unsigned));
+    const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, privKey, data);
+    signed.signature = b64urlEncode(new Uint8Array(sig));
+    const json = JSON.stringify(signed, null, 2);
+    document.getElementById("signedJsonOut").textContent = json;
+    window._lastSigned = json;
+    const expMonth = monthStr(new Date(signed.expires_at));
+    const svg = badgeSvg("verified · exp " + expMonth, "#4c1");
+    const snippet = '<a href="' + signed.app.url + '/.well-known/vibe-security.json">\n  ' + svg + '\n</a>';
+    document.getElementById("signedBadgePreview").innerHTML = '<a href="' + signed.app.url + '/.well-known/vibe-security.json">' + svg + '</a>';
+    document.getElementById("signedBadgeSnippet").value = snippet;
+    document.getElementById("signOut").classList.remove("hidden");
+  } catch (e) {
+    alert("Signing failed: " + e.message);
+  }
+}
+
+function copySigned() { navigator.clipboard.writeText(window._lastSigned || "").then(() => alert("Copied.")); }
+function copySignedBadge() { navigator.clipboard.writeText(document.getElementById("signedBadgeSnippet").value).then(() => alert("Copied.")); }
+function downloadSigned() {
+  const blob = new Blob([window._lastSigned || ""], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "vibe-security.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+renderChecks();
+</script>
+</body>
+</html>
